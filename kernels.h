@@ -1,6 +1,16 @@
 #include "cuda_fp16.h"
+#include "stdint.h"
 
-#define BLOCK 128
+#define HALF_ROUND_STYLE 1  // 1: nearest, -1: truncate (fastest, default)
+#include "half.hpp"
+using half_float::half;
+using namespace half_float::literal;
+
+typedef float real_t;
+typedef half_float::half half_t_host;
+typedef __half half_t_device;
+
+#define BLOCK 16
 
 #ifndef ZERO_FLOAT
     #define ZERO_FLOAT 2.2e-20
@@ -29,23 +39,23 @@ __device__ __forceinline__ void axpy__(const float a, const float b, __half &c) 
 
 __device__ unsigned long long errors = 0;
 
-template<const uint32 THRESHOLD_UINT32>
+template<const uint32_t THRESHOLD_uint32_t>
 __device__ void check_bit_error(const __half &lhs, const float &rhs) {
-	const uint32 lhs_data = __half2uint_rn(lhs);
-	const uint32 rhs_data = __float_as_uint(rhs);
-	uint32 sub_res;
+	const uint32_t lhs_data = __half2uint_rn(lhs);
+	const uint32_t rhs_data = __float_as_uint(rhs);
+	uint32_t sub_res;
 	if (lhs_data > rhs_data) {
 		sub_res = lhs_data - rhs_data;
 	} else {
 		sub_res = rhs_data - lhs_data;
 	}
 
-	if (sub_res > THRESHOLD_UINT32) {
+	if (sub_res > THRESHOLD_uint32_t) {
 		atomicAdd(&errors, 1);
 	}
 }
 
-template<const uint32 THRESHOLD_UINT32>
+template<const uint32_t THRESHOLD_uint32_t>
 __device__ void check_bit_error(const float &lhs, const float &rhs) {
 	float diff = fabs(lhs - rhs);
 	if (diff > ZERO_FLOAT) {
@@ -53,13 +63,13 @@ __device__ void check_bit_error(const float &lhs, const float &rhs) {
 	}
 }
 
-template<const uint32 THRESHOLD, const uint32 COUNT, typename real_t, typename half_t>
-__global__ void matrix_mult_dmr_kernel(const real_t *A, const real_t *B, int M, int N, int K, real_t *C, half_t *C_h) {
+template<const uint32_t THRESHOLD, const uint32_t COUNT, typename real_t, typename half_t>
+__global__ void matrix_mult_dmr_kernel(real_t *A, real_t *B, int M, int N, int K, real_t *C, half_t *C_h) {
 
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     
-    if (row < m && col < n) {
+    if (row < M && col < N) {
         register real_t acc_real_t = 0.0;
 	    register half_t acc_half_t = 0.0;
 
@@ -80,9 +90,9 @@ __global__ void matrix_mult_dmr_kernel(const real_t *A, const real_t *B, int M, 
 
 }
 
-template<const uint32 THRESHOLD, const uint32 COUNT, typename real_t, typename half_t>
-void matrix_mult_dmr(const real_t *A, const real_t *B, int M, int N, int K, real_t *C, half_t *C_h) {
+template<const uint32_t THRESHOLD, const uint32_t COUNT, typename real_t, typename half_t>
+void matrix_mult_dmr(real_t *A, real_t *B, int M, int N, int K, real_t *C, half_t *C_h) {
     dim3 threads(BLOCK, BLOCK);
 	dim3 grid(ceil(float(M)/BLOCK), ceil(float(N)/BLOCK));
-    matrix_mult_dmr_kernel<<<grid,threads>>>(A, B, M, N, K, C, C_h);
+    matrix_mult_dmr_kernel<THRESHOLD, COUNT><<<grid,threads>>>(A, B, M, N, K, C, (half_t_device*)C_h);
 }

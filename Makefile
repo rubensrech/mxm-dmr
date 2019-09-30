@@ -23,19 +23,19 @@ OBJ= main.o kernels.o
 LDFLAGS+= -L$(CUDAPATH)/lib64  -lcudart  -lcurand -lcudadevrt -lpthread
 
 OBJS = $(addprefix $(OBJDIR), $(OBJ))
-DEPS = $(wildcard src/*.h) Makefile
+DEPS = $(wildcard *.h) Makefile
 
 all: mkdir $(EXEC)
 
 
-$(EXEC): $(OBJS)  
-	$(CXX) $^ -o $@ $(INCLUDE) $(LDFLAGS) 
+# $(EXEC): $(OBJS)  
+# 	$(CXX) $^ -o $@ $(INCLUDE) $(LDFLAGS) 
 
 $(OBJDIR)%.o: %.cpp $(DEPS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(INCLUDE)
 	
-$(OBJDIR)%.o: %.cu $(DEPS)
-	$(NVCC) $(ARCH) $(NVCCFLAGS) -c $< -o $@ $(INCLUDE) 
+$(EXEC): main.cu $(DEPS)
+	$(NVCC) $(ARCH) $(NVCCFLAGS) $< -o $@ $(INCLUDE) 
 	
 
 mkdir:
