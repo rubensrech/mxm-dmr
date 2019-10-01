@@ -1,5 +1,6 @@
 #include "cuda_fp16.h"
 #include "stdint.h"
+#include <iostream>
 
 #define HALF_ROUND_STYLE 1  // 1: nearest, -1: truncate (fastest, default)
 #include "half.hpp"
@@ -7,10 +8,10 @@ using half_float::half;
 using namespace half_float::literal;
 
 typedef float real_t;
-typedef half_float::half half_t_host;
+typedef half_float::half half_t;
 typedef __half half_t_device;
 
-#define BLOCK 16
+#define BLOCK_SIZE 16
 
 #ifndef ZERO_FLOAT
     #define ZERO_FLOAT 2.2e-20
@@ -92,7 +93,9 @@ __global__ void matrix_mult_dmr_kernel(real_t *A, real_t *B, int M, int N, int K
 
 template<const uint32_t THRESHOLD, const uint32_t COUNT, typename real_t, typename half_t>
 void matrix_mult_dmr(real_t *A, real_t *B, int M, int N, int K, real_t *C, half_t *C_h) {
-    dim3 threads(BLOCK, BLOCK);
-	dim3 grid(ceil(float(M)/BLOCK), ceil(float(N)/BLOCK));
-    matrix_mult_dmr_kernel<THRESHOLD, COUNT><<<grid,threads>>>(A, B, M, N, K, C, (half_t_device*)C_h);
+    unsigned int grid_rows = (M + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    unsigned int grid_cols = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    dim3 dimGrid(grid_cols, grid_rows);
+    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+    matrix_mult_dmr_kernel<THRESHOLD, COUNT><<<dimGrid,dimBlock>>>(A, B, M, N, K, C, (__half*)C_h);
 }

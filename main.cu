@@ -11,33 +11,35 @@ int main(int argc, char **argv) {
 	int m;
 	int n;
 	int k;
-	m = n = k = 512;
+	m = n = k = 2048;
 
 	real_t alpha = 1;
 	real_t beta = 1;
 
-	std::vector<real_t> host_a(m * k, alpha);
-	std::vector<real_t> host_b(k * n, beta);
-	std::vector<real_t> host_c(m * n, 0.0);
-	std::vector<half_t_host> host_c_half(m * n, 0.0_h);
+	real_t* host_a = (real_t*)calloc(m * k, sizeof(real_t));
+	real_t* host_b = (real_t*)calloc(k * n, sizeof(real_t));
+	real_t* host_c = (real_t*)calloc(m * n, sizeof(real_t));
+	half_t* host_c_half = (half_t*)calloc(m * n, sizeof(half_t));
+
+	for (int i = 0; i < m * k; i++) host_a[i] = alpha;
+	for (int i = 0; i < m * k; i++) host_b[i] = beta;
 
 	real_t *device_a, *device_b, *device_c;
-	half_t_host *device_c_half;
-
+	half_t *device_c_half;
 	cudaMalloc((void**)&device_a, m * k * sizeof(real_t));
 	cudaMalloc((void**)&device_b, k * n * sizeof(real_t));
 	cudaMalloc((void**)&device_c, m * n * sizeof(real_t));
-	cudaMalloc((void**)&device_c_half, m * n * sizeof(half_t_host));
+	cudaMalloc((void**)&device_c_half, m * n * sizeof(half_t));
 
-	cudaMemcpy(device_a, host_a.data(), m * k * sizeof(real_t), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_b, host_b.data(), k * n * sizeof(real_t), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_c, host_c.data(), m * n * sizeof(real_t), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_c_half, host_c_half.data(), m * n * sizeof(half_t_host), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_a, host_a, m * k * sizeof(real_t), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_b, host_b, k * n * sizeof(real_t), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_c, host_c, m * n * sizeof(real_t), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_c_half, host_c_half, m * n * sizeof(half_t), cudaMemcpyHostToDevice);
 
 	matrix_mult_dmr<THRESHOLD, CHECK_BLOCK>(device_a, device_b, m, n, k, device_c, device_c_half);
 
-	cudaMemcpy(host_c.data(), device_c, m * n * sizeof(real_t), cudaMemcpyDeviceToHost);
-	cudaMemcpy(host_c_half.data(), device_c_half, m * n * sizeof(half_t_host), cudaMemcpyDeviceToHost);
+	cudaMemcpy(host_c, device_c, m * n * sizeof(real_t), cudaMemcpyDeviceToHost);
+	cudaMemcpy(host_c_half, device_c_half, m * n * sizeof(half_t), cudaMemcpyDeviceToHost);
 
     std::cout << "FLOAT" << std::endl;
 	for (int i = 0; i < 10; i++) {
